@@ -30,25 +30,17 @@ public class Admin {
     @Column(name = "full_name", nullable = false)
     private String fullName;
 
-    @Column(name = "employee_id", unique = true)
-    private String employeeId;
-
-    @Column(name = "position")
-    private String position;
-
     @Column(name = "phone")
     private String phone;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column(name = "is_active")
-    private Boolean isActive;
+
 
     // Constructor
     public Admin() {
         this.createdAt = LocalDateTime.now();
-        this.isActive = true;
     }
 
 

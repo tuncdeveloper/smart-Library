@@ -6,9 +6,7 @@ import java.util.List;
 
 public interface StudentService {
 
-    StudentLoginResponseDTO login(StudentLoginDTO loginDto);
 
-    void register(StudentRegisterDTO registerDto);
 
     List<StudentListDTO> getAllStudents();
 

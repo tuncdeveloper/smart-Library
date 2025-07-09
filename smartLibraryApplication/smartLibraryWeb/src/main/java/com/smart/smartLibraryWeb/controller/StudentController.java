@@ -17,23 +17,6 @@ public class StudentController {
 
     private final StudentService studentService;
 
-    // Öğrenci kaydı
-    @PostMapping("/register")
-    public ResponseEntity<String> registerStudent(@RequestBody StudentRegisterDTO registerDTO) {
-        try {
-            studentService.register(registerDTO);
-            return ResponseEntity.status(HttpStatus.CREATED).body("Kayıt başarılı");
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
-    }
-
-    // Öğrenci girişi
-    @PostMapping("/login")
-    public ResponseEntity<StudentLoginResponseDTO> login(@RequestBody StudentLoginDTO loginDto) {
-        StudentLoginResponseDTO response = studentService.login(loginDto);
-        return ResponseEntity.ok(response);
-    }
 
 
     // Tüm öğrencileri listele

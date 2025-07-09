@@ -32,11 +32,6 @@ public class Student {
     private String fullName;
 
 
-    @Column(name = "department")
-    private String department;
-
-    @Column(name = "grade")
-    private Integer grade;
 
     @Column(name = "phone")
     private String phone;

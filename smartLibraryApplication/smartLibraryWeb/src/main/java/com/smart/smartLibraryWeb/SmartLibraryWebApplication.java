@@ -8,6 +8,7 @@ public class SmartLibraryWebApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(SmartLibraryWebApplication.class, args);
+
 	}
 
 }

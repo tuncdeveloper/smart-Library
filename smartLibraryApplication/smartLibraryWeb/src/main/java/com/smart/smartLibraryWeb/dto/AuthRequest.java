@@ -1,4 +1,4 @@
-package com.smart.smartLibraryWeb.dto.studentDTO;
+package com.smart.smartLibraryWeb.dto;
 
 
 import lombok.Getter;
@@ -8,12 +8,8 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class StudentRegisterDTO {
-
+public class AuthRequest {
     private String username;
     private String password;
-    private String email;
-    private String fullName;
-    private String phone;
 
 }

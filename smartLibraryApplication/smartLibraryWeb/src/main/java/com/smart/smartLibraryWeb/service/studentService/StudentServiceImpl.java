@@ -9,7 +9,10 @@ import com.smart.smartLibraryWeb.mapper.studentMapper.StudentUpdateMapper;
 import com.smart.smartLibraryWeb.model.Student;
 import com.smart.smartLibraryWeb.repository.StudentRepository;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,53 +21,13 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StudentServiceImpl implements StudentService {
 
     private final StudentRepository studentRepository;
     private final StudentListMapper studentListMapper;
-    private final StudentRegisterMapper studentRegisterMapper;
     private final StudentUpdateMapper studentUpdateMapper;
-
-    @Override
-    public StudentLoginResponseDTO login(StudentLoginDTO loginDto) {
-        Optional<Student> optionalStudent = studentRepository.findByUsername(loginDto.getUsername());
-
-        if (optionalStudent.isPresent()) {
-            Student student = optionalStudent.get();
-
-            if (student.getPassword().equals(loginDto.getPassword())) {
-                StudentLoginResponseDTO responseDTO = new StudentLoginResponseDTO();
-                responseDTO.setMessage("Giriş başarılı");
-                responseDTO.setId(student.getId());
-                responseDTO.setUsername(student.getUsername());
-                responseDTO.setEmail(student.getEmail());
-                responseDTO.setFullName(student.getFullName());
-                responseDTO.setDepartment(student.getDepartment());
-                responseDTO.setGrade(student.getGrade());
-                responseDTO.setPhone(student.getPhone());
-
-                return responseDTO;
-            } else {
-                throw new BadRequestException("Şifre hatalı");
-            }
-        } else {
-            throw new ResourceNotFoundException("Kullanıcı adı bulunamadı");
-        }
-    }
-
-
-    @Override
-    public void register(StudentRegisterDTO registerDto) {
-        if (studentRepository.findByUsername(registerDto.getUsername()).isPresent()) {
-            throw new BadRequestException("Kullanıcı adı zaten kayıtlı.");
-        }
-        if (studentRepository.findByEmail(registerDto.getEmail()).isPresent()) {
-            throw new BadRequestException("Email zaten kayıtlı.");
-        }
-
-        Student student = studentRegisterMapper.mapToEntity(registerDto);
-        studentRepository.save(student);
-    }
+    private final PasswordEncoder passwordEncoder; // PasswordEncoder eklendi
 
     @Override
     public List<StudentListDTO> getAllStudents() {
@@ -88,17 +51,50 @@ public class StudentServiceImpl implements StudentService {
         studentRepository.deleteById(id);
     }
 
-
-
-
+    @Override
+    @Transactional
     public StudentUpdateDTO updateStudent(StudentUpdateDTO dto) {
+        log.info("updateStudent called with DTO: {}", dto);
+
         Student existingStudent = studentRepository.findById(dto.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Student not found with id: " + dto.getId()));
 
-        studentUpdateMapper.updateStudentFromDto(dto, existingStudent); // 🔄 alanları kopyala
+        // Eski şifre doğrulaması
+        if (dto.getOldPassword() != null && dto.getNewPassword() != null) {
+            if (!passwordEncoder.matches(dto.getOldPassword(), existingStudent.getPassword())) {
+                throw new BadRequestException("Eski şifre yanlış");
+            }
 
-        Student updatedStudent = studentRepository.save(existingStudent);
-        return studentUpdateMapper.mapToDto(updatedStudent);
+            // Yeni şifreyi hashle
+            String encodedPassword = passwordEncoder.encode(dto.getNewPassword());
+            existingStudent.setPassword(encodedPassword);
+            log.info("Password updated successfully");
+        }
+
+        // Diğer alanları güncelle
+        if (dto.getUsername() != null) {
+            existingStudent.setUsername(dto.getUsername());
+        }
+        if (dto.getEmail() != null) {
+            existingStudent.setEmail(dto.getEmail());
+        }
+        if (dto.getFullName() != null) {
+            existingStudent.setFullName(dto.getFullName());
+        }
+        if (dto.getPhone() != null) {
+            existingStudent.setPhone(dto.getPhone());
+        }
+
+        Student savedStudent = studentRepository.save(existingStudent);
+
+        // DTO'ya dönüştürürken şifreleri dahil etme
+        StudentUpdateDTO result = new StudentUpdateDTO();
+        result.setId(savedStudent.getId());
+        result.setUsername(savedStudent.getUsername());
+        result.setEmail(savedStudent.getEmail());
+        result.setFullName(savedStudent.getFullName());
+        result.setPhone(savedStudent.getPhone());
+
+        return result;
     }
-
 }

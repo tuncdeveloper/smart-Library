@@ -1,87 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Save, X, Lock } from 'lucide-react';
-
-type StudentUpdateDTO = {
-    id: number;
-    username: string;
-    password?: string; // Optional yapıldı
-    email: string;
-    fullName: string;
-    department: string;
-    grade: number;
-    phone: string;
-};
-
-type StudentLoginResponseDTO = {
-    id: number;
-    message: string;
-    username: string;
-    email: string;
-    fullName: string;
-    department: string;
-    grade: number;
-    phone: string;
-};
-
-const useAuth = () => {
-    const [user, setUser] = useState<StudentLoginResponseDTO | null>(null);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-
-    useEffect(() => {
-        try {
-            const storedUser = localStorage.getItem('student');
-            if (storedUser) {
-                const parsedUser: StudentLoginResponseDTO = JSON.parse(storedUser);
-                console.log('localStorage\'dan kullanıcı yüklendi:', parsedUser);
-                setUser(parsedUser);
-            }
-        } catch (error) {
-            console.error('localStorage\'dan kullanıcı yüklenemedi:', error);
-            localStorage.removeItem('student');
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    return { user, isLoading };
-};
-
-const updateStudent = async (id: number, data: StudentUpdateDTO): Promise<StudentUpdateDTO> => {
-    try {
-        // Şifre alanı boşsa payload'dan kaldır
-        const payload = { ...data };
-        if (payload.password === '') {
-            delete payload.password;
-        }
-
-        const response = await fetch(`/api/students/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const updatedStudent: StudentUpdateDTO = await response.json();
-        return updatedStudent;
-    } catch (error) {
-        console.error('API çağrısı hatası:', error);
-        throw error;
-    }
-};
+import { Edit, Save, X, Lock, AlertCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { StudentUpdateDTO } from '../types/student';
+import {updateStudent} from "../features/student/studentService";
 
 const StudentInformation: React.FC = () => {
-    const { user, isLoading } = useAuth();
+    const { user, isLoading, login } = useAuth();
     const [formData, setFormData] = useState<StudentUpdateDTO | null>(null);
-    const [editingField, setEditingField] = useState<keyof Omit<StudentUpdateDTO, 'password'> | null>(null); // Password alanı hariç
+    const [editingField, setEditingField] = useState<keyof Omit<StudentUpdateDTO, 'password'> | null>(null);
     const [editValue, setEditValue] = useState<string | number>('');
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [passwordConfirmVisible, setPasswordConfirmVisible] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -90,9 +22,8 @@ const StudentInformation: React.FC = () => {
                 username: user.username,
                 email: user.email,
                 fullName: user.fullName,
-                department: user.department,
-                grade: user.grade,
                 phone: user.phone,
+                password: '',
             });
         }
     }, [user]);
@@ -120,51 +51,58 @@ const StudentInformation: React.FC = () => {
     const handleEditClick = (field: keyof Omit<StudentUpdateDTO, 'password'>, currentValue: string | number) => {
         setEditingField(field);
         setEditValue(currentValue);
+        setError(null);
     };
 
     const handleSaveEdit = async () => {
         if (!editingField || !formData) return;
 
+        setIsUpdating(true);
+        setError(null);
+
         try {
+            // Sadece düzenlenen alanı güncelle
             const dataToUpdate: StudentUpdateDTO = {
-                ...formData,
-                [editingField]: editValue,
+                id: formData.id,
+                username: editingField === 'username' ? editValue as string : formData.username,
+                email: editingField === 'email' ? editValue as string : formData.email,
+                fullName: editingField === 'fullName' ? editValue as string : formData.fullName,
+                phone: editingField === 'phone' ? editValue as string : formData.phone,
+                password: '', // Şifre güncelleme ayrı fonksiyonda
             };
+
+            console.log('Güncelleme verisi:', dataToUpdate);
 
             const updated = await updateStudent(formData.id, dataToUpdate);
 
-            setFormData({
-                ...updated,
-            });
-
+            setFormData(updated);
             setEditingField(null);
             setEditValue('');
 
-            const updatedUserLocalStorage: StudentLoginResponseDTO = {
-                id: updated.id,
-                message: 'success',
+            // AuthContext'teki user state'i güncelle
+            const updatedUser = {
+                ...user!,
                 username: updated.username,
                 email: updated.email,
                 fullName: updated.fullName,
-                department: updated.department,
-                grade: updated.grade,
                 phone: updated.phone,
             };
 
-            localStorage.setItem('student', JSON.stringify(updatedUserLocalStorage));
-            alert('Bilgi başarıyla güncellendi ve veritabanına kaydedildi!');
+            login(updatedUser);
+            alert('Bilgi başarıyla güncellendi!');
         } catch (error) {
-            alert('Güncelleme sırasında hata oluştu: ' + (error as Error).message);
+            const errorMessage = (error as Error).message;
+            setError(errorMessage);
             console.error('Güncelleme hatası:', error);
+            alert('Güncelleme sırasında hata oluştu: ' + errorMessage);
+        } finally {
+            setIsUpdating(false);
         }
     };
 
     const handleSavePassword = async () => {
         if (!formData) return;
 
-        // Şifre doğrulama mantığı burada olmalı
-        // Basit örnek: Eski şifre doğru mu?
-        // Gerçek uygulamada API üzerinden doğrulama yapılmalı
         if (!oldPassword) {
             alert('Lütfen eski şifrenizi girin!');
             return;
@@ -175,39 +113,58 @@ const StudentInformation: React.FC = () => {
             return;
         }
 
+        if (newPassword.length < 3) {
+            alert('Yeni şifre en az 3 karakter olmalıdır!');
+            return;
+        }
+
+        setIsUpdating(true);
+        setError(null);
+
         try {
-            const updatedData: StudentUpdateDTO = {
-                ...formData,
-                password: newPassword,
+            const passwordUpdateData: StudentUpdateDTO = {
+                id: formData.id,
+                username: formData.username,
+                email: formData.email,
+                fullName: formData.fullName,
+                phone: formData.phone,
+                oldPassword: oldPassword, // Eski şifre
+                newPassword: newPassword, // Yeni şifre
             };
 
-            const updated = await updateStudent(formData.id, updatedData);
-
-            setFormData({
-                ...updated,
-            });
+            const updated = await updateStudent(formData.id, passwordUpdateData);
 
             setPasswordConfirmVisible(false);
             setOldPassword('');
             setNewPassword('');
-
             alert('Şifre başarıyla güncellendi!');
 
-            const updatedUserLocalStorage: StudentLoginResponseDTO = {
-                id: updated.id,
-                message: 'success',
+            // AuthContext'teki user state'i güncelle
+            const updatedUser = {
+                ...user!,
                 username: updated.username,
                 email: updated.email,
                 fullName: updated.fullName,
-                department: updated.department,
-                grade: updated.grade,
                 phone: updated.phone,
             };
 
-            localStorage.setItem('student', JSON.stringify(updatedUserLocalStorage));
+            login(updatedUser);
         } catch (error) {
-            alert('Şifre güncelleme hatası: ' + (error as Error).message);
+            const errorMessage = (error as Error).message;
+            setError(errorMessage);
+            alert('Şifre güncelleme hatası: ' + errorMessage);
+        } finally {
+            setIsUpdating(false);
         }
+    };
+
+// verifyPassword import'unu kaldır
+
+    const handleCancelPasswordEdit = () => {
+        setPasswordConfirmVisible(false);
+        setOldPassword('');
+        setNewPassword('');
+        setError(null);
     };
 
     const InfoRow = ({
@@ -261,45 +218,48 @@ const StudentInformation: React.FC = () => {
                             min={type === 'number' ? 1 : undefined}
                             max={type === 'number' ? 4 : undefined}
                             autoFocus
+                            disabled={isUpdating}
                         />
                         <button
                             onClick={handleSaveEdit}
+                            disabled={isUpdating}
                             style={{
                                 padding: '8px 12px',
-                                backgroundColor: '#4CAF50',
+                                backgroundColor: isUpdating ? '#ccc' : '#4CAF50',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '6px',
-                                cursor: 'pointer',
+                                cursor: isUpdating ? 'not-allowed' : 'pointer',
                                 fontSize: '12px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '4px',
                                 transition: 'background-color 0.3s ease',
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#45a049'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4CAF50'}
+                            onMouseEnter={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#45a049')}
+                            onMouseLeave={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#4CAF50')}
                         >
                             <Save size={14} />
-                            Kaydet
+                            {isUpdating ? 'Kaydediliyor...' : 'Kaydet'}
                         </button>
                         <button
                             onClick={() => setEditingField(null)}
+                            disabled={isUpdating}
                             style={{
                                 padding: '8px 12px',
-                                backgroundColor: '#f44336',
+                                backgroundColor: isUpdating ? '#ccc' : '#f44336',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '6px',
-                                cursor: 'pointer',
+                                cursor: isUpdating ? 'not-allowed' : 'pointer',
                                 fontSize: '12px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '4px',
                                 transition: 'background-color 0.3s ease',
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d32f2f'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f44336'}
+                            onMouseEnter={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#d32f2f')}
+                            onMouseLeave={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#f44336')}
                         >
                             <X size={14} />
                             İptal
@@ -314,21 +274,22 @@ const StudentInformation: React.FC = () => {
             {editingField !== field && (
                 <button
                     onClick={() => handleEditClick(field, value)}
+                    disabled={isUpdating}
                     style={{
                         padding: '8px 16px',
-                        backgroundColor: '#667eea',
+                        backgroundColor: isUpdating ? '#ccc' : '#667eea',
                         color: 'white',
                         border: 'none',
                         borderRadius: '6px',
-                        cursor: 'pointer',
+                        cursor: isUpdating ? 'not-allowed' : 'pointer',
                         fontSize: '14px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
                         transition: 'background-color 0.3s ease',
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#5a6fd8'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#667eea'}
+                    onMouseEnter={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#5a6fd8')}
+                    onMouseLeave={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#667eea')}
                 >
                     <Edit size={14} />
                     Düzenle
@@ -372,12 +333,27 @@ const StudentInformation: React.FC = () => {
                     </p>
                 </div>
 
+                {error && (
+                    <div style={{
+                        margin: '20px 30px 0',
+                        padding: '15px',
+                        backgroundColor: '#ffebee',
+                        borderRadius: '8px',
+                        border: '1px solid #f44336',
+                        color: '#c62828',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                    }}>
+                        <AlertCircle size={20} />
+                        <span>{error}</span>
+                    </div>
+                )}
+
                 <div style={{ padding: '30px' }}>
                     <InfoRow label="Kullanıcı Adı" field="username" value={formData.username} />
                     <InfoRow label="Ad Soyad" field="fullName" value={formData.fullName} />
                     <InfoRow label="Email" field="email" value={formData.email} type="email" />
-                    <InfoRow label="Bölüm" field="department" value={formData.department} />
-                    <InfoRow label="Sınıf" field="grade" value={formData.grade} type="number" />
                     <InfoRow label="Telefon" field="phone" value={formData.phone} />
 
                     {/* Şifre alanı */}
@@ -399,21 +375,22 @@ const StudentInformation: React.FC = () => {
                         </span>
                         <button
                             onClick={() => setPasswordConfirmVisible(true)}
+                            disabled={isUpdating}
                             style={{
                                 padding: '8px 16px',
-                                backgroundColor: '#667eea',
+                                backgroundColor: isUpdating ? '#ccc' : '#667eea',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '6px',
-                                cursor: 'pointer',
+                                cursor: isUpdating ? 'not-allowed' : 'pointer',
                                 fontSize: '14px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
                                 transition: 'background-color 0.3s ease',
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#5a6fd8'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#667eea'}
+                            onMouseEnter={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#5a6fd8')}
+                            onMouseLeave={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#667eea')}
                         >
                             <Lock size={14} />
                             Şifreyi Değiştir
@@ -456,6 +433,7 @@ const StudentInformation: React.FC = () => {
                                 type="password"
                                 value={oldPassword}
                                 onChange={(e) => setOldPassword(e.target.value)}
+                                disabled={isUpdating}
                                 style={{
                                     padding: '12px',
                                     width: '100%',
@@ -465,9 +443,10 @@ const StudentInformation: React.FC = () => {
                                     outline: 'none',
                                     transition: 'border-color 0.3s ease',
                                     boxSizing: 'border-box',
+                                    backgroundColor: isUpdating ? '#f5f5f5' : 'white',
                                 }}
-                                onFocus={(e) => e.currentTarget.style.borderColor = '#667eea'}
-                                onBlur={(e) => e.currentTarget.style.borderColor = '#e9ecef'}
+                                onFocus={(e) => !isUpdating && (e.currentTarget.style.borderColor = '#667eea')}
+                                onBlur={(e) => !isUpdating && (e.currentTarget.style.borderColor = '#e9ecef')}
                             />
                         </div>
                         <div style={{ marginBottom: '20px' }}>
@@ -484,6 +463,7 @@ const StudentInformation: React.FC = () => {
                                 type="password"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
+                                disabled={isUpdating}
                                 style={{
                                     padding: '12px',
                                     width: '100%',
@@ -493,21 +473,23 @@ const StudentInformation: React.FC = () => {
                                     outline: 'none',
                                     transition: 'border-color 0.3s ease',
                                     boxSizing: 'border-box',
+                                    backgroundColor: isUpdating ? '#f5f5f5' : 'white',
                                 }}
-                                onFocus={(e) => e.currentTarget.style.borderColor = '#667eea'}
-                                onBlur={(e) => e.currentTarget.style.borderColor = '#e9ecef'}
+                                onFocus={(e) => !isUpdating && (e.currentTarget.style.borderColor = '#667eea')}
+                                onBlur={(e) => !isUpdating && (e.currentTarget.style.borderColor = '#e9ecef')}
                             />
                         </div>
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <button
                                 onClick={handleSavePassword}
+                                disabled={isUpdating}
                                 style={{
                                     padding: '12px 24px',
-                                    backgroundColor: '#4CAF50',
+                                    backgroundColor: isUpdating ? '#ccc' : '#4CAF50',
                                     color: 'white',
                                     border: 'none',
                                     borderRadius: '8px',
-                                    cursor: 'pointer',
+                                    cursor: isUpdating ? 'not-allowed' : 'pointer',
                                     fontSize: '14px',
                                     fontWeight: 'bold',
                                     display: 'flex',
@@ -515,21 +497,22 @@ const StudentInformation: React.FC = () => {
                                     gap: '8px',
                                     transition: 'background-color 0.3s ease',
                                 }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#45a049'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4CAF50'}
+                                onMouseEnter={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#45a049')}
+                                onMouseLeave={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#4CAF50')}
                             >
                                 <Save size={16} />
-                                Şifreyi Kaydet
+                                {isUpdating ? 'Kaydediliyor...' : 'Şifreyi Kaydet'}
                             </button>
                             <button
-                                onClick={() => setPasswordConfirmVisible(false)}
+                                onClick={handleCancelPasswordEdit}
+                                disabled={isUpdating}
                                 style={{
                                     padding: '12px 24px',
-                                    backgroundColor: '#f44336',
+                                    backgroundColor: isUpdating ? '#ccc' : '#f44336',
                                     color: 'white',
                                     border: 'none',
                                     borderRadius: '8px',
-                                    cursor: 'pointer',
+                                    cursor: isUpdating ? 'not-allowed' : 'pointer',
                                     fontSize: '14px',
                                     fontWeight: 'bold',
                                     display: 'flex',
@@ -537,8 +520,8 @@ const StudentInformation: React.FC = () => {
                                     gap: '8px',
                                     transition: 'background-color 0.3s ease',
                                 }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d32f2f'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f44336'}
+                                onMouseEnter={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#d32f2f')}
+                                onMouseLeave={(e) => !isUpdating && (e.currentTarget.style.backgroundColor = '#f44336')}
                             >
                                 <X size={16} />
                                 İptal

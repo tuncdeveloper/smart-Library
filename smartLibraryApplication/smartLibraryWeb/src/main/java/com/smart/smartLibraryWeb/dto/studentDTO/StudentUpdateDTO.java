@@ -13,20 +13,12 @@ import lombok.Setter;
 public class StudentUpdateDTO {
 
     private Long id;
-
     private String username;
-
-    private String password;
-
     private String email;
-
     private String fullName;
-
-    private String department;
-
-    private Integer grade;
-
     private String phone;
+    private String oldPassword;   // Eski şifre için
+    private String newPassword;   // Yeni şifre için
 
     // password güncelleme ayrı DTO veya endpoint ile yapılabilir.
 

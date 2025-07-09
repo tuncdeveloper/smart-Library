@@ -1,4 +1,5 @@
-import axios from 'axios';
+// src/services/BookService.ts
+import axios from '../../utils/axiosConfig';
 import {
     BookFavoriteDTO,
     BookCreateDTO,
@@ -36,8 +37,6 @@ export const getBookById = async (id: number): Promise<BookDetailDTO> => {
     const res = await axios.get<BookDetailDTO>(`${BASE_URL}/id/${id}`);
     return res.data;
 };
-
-
 
 export const getBooksByCategory = async (category: string): Promise<BookListDTO[]> => {
     const res = await axios.get<BookListDTO[]>(`${BASE_URL}/category/${category}`);
@@ -79,8 +78,6 @@ export const getBookRatingDetail = async (bookId: number): Promise<BookRatingDet
     const res = await axios.get<BookRatingDetailDTO>(`${BASE_URL}/${bookId}/rating-detail`);
     return res.data;
 };
-// BookService.ts dosyanıza eklenecek fonksiyon
-
 
 export const getTotalRatings = async (bookId: number): Promise<number> => {
     try {
@@ -91,6 +88,7 @@ export const getTotalRatings = async (bookId: number): Promise<number> => {
         return 0;
     }
 };
+
 export const commentBook = async (data: BookRatingRequestDTO): Promise<BookRatingResponseDTO> => {
     const res = await axios.post<BookRatingResponseDTO>(`${BASE_URL}/comment`, data);
     return res.data;

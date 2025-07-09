@@ -7,6 +7,7 @@ interface AuthContextType {
     login: (user: StudentLoginResponseDTO) => void;
     logout: () => void;
     isLoading: boolean;
+    isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,11 +22,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (storedUser) {
                 const parsedUser = JSON.parse(storedUser);
                 console.log('localStorage\'dan kullanıcı yüklendi:', parsedUser);
-                setUser(parsedUser);
+
+                // Token var mı kontrol et
+                if (parsedUser.token) {
+                    setUser(parsedUser);
+                } else {
+                    console.warn('Token bulunamadı, kullanıcı çıkış yapılıyor');
+                    localStorage.removeItem('student');
+                }
             }
         } catch (error) {
             console.error('localStorage\'dan kullanıcı yüklenemedi:', error);
-            localStorage.removeItem('student'); // Bozuk veriyi temizle
+            localStorage.removeItem('student');
         } finally {
             setIsLoading(false);
         }
@@ -41,10 +49,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('Kullanıcı çıkış yapıyor');
         setUser(null);
         localStorage.removeItem('student');
+        window.location.href = '/login';
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+        <AuthContext.Provider value={{
+            user,
+            login,
+            logout,
+            isLoading,
+            isAuthenticated: !!user?.token
+        }}>
             {children}
         </AuthContext.Provider>
     );

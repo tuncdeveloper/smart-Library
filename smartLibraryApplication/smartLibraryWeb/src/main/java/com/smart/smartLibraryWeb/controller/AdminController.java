@@ -16,16 +16,6 @@ public class AdminController {
 
     private final AdminService adminService;
 
-    // Admin login endpoint (POST)
-    @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody AdminLoginDTO loginDTO) {
-        boolean success = adminService.login(loginDTO);
-        if (success) {
-            return ResponseEntity.ok("Giriş başarılı");
-        } else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Kullanıcı adı veya parola hatalı");
-        }
-    }
 
     // Kullanıcı adı ile admin profil bilgisi getirme (GET)
     @GetMapping("/profile/{username}")

@@ -6,8 +6,6 @@ interface Student {
     email: string;
     fullName: string;
     studentNumber: string;
-    department: string;
-    grade: number;
     phone: string;
 }
 
@@ -52,8 +50,7 @@ const StudentPage: React.FC = () => {
                         { label: "Kullanıcı Adı", value: student.username },
                         { label: "Email", value: student.email },
                         { label: "Telefon", value: student.phone },
-                        { label: "Bölüm", value: student.department },
-                        { label: "Sınıf", value: student.grade.toString() },
+
                     ].map((item) => (
                         <li
                             key={item.label}

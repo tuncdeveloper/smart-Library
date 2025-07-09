@@ -9,8 +9,6 @@ const RegisterPage: React.FC = () => {
         password: '',
         email: '',
         fullName: '',
-        department: '',
-        grade: '' as number | '',
         phone: ''
     });
     const [loading, setLoading] = useState(false);
@@ -20,7 +18,7 @@ const RegisterPage: React.FC = () => {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: name === 'grade' ? (value === '' ? '' : Number(value)) : value
+            [name]: value
         }));
     };
 
@@ -30,13 +28,7 @@ const RegisterPage: React.FC = () => {
         setError('');
 
         try {
-            // Grade kontrolü ve dönüşümü
-            const payload = {
-                ...formData,
-                grade: formData.grade === '' ? 0 : Number(formData.grade)
-            };
-
-            const response = await registerStudent(payload);
+            const response = await registerStudent(formData);
             alert(response);
             navigate('/login');
         } catch (error: any) {
@@ -48,7 +40,8 @@ const RegisterPage: React.FC = () => {
         }
     };
 
-    // Stil tanımlamaları
+    // Stil tanımlamaları aynen kalabilir
+
     const containerStyle: React.CSSProperties = {
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -169,8 +162,6 @@ const RegisterPage: React.FC = () => {
                             { name: 'password', label: '🔒 Parola', type: 'password', placeholder: 'Güçlü bir parola oluşturun' },
                             { name: 'email', label: '📧 Email', type: 'email', placeholder: 'ornek@email.com' },
                             { name: 'fullName', label: '🏷️ Ad Soyad', type: 'text', placeholder: 'Adınız ve soyadınız' },
-                            { name: 'department', label: '🎓 Bölüm', type: 'text', placeholder: 'Bölümünüzü giriniz' },
-                            { name: 'grade', label: '📊 Sınıf', type: 'number', placeholder: 'Sınıfınızı seçiniz (1-10)', min: 1, max: 10 },
                             { name: 'phone', label: '📱 Telefon', type: 'tel', placeholder: '+90 5XX XXX XX XX' },
                         ].map((field) => (
                             <label key={field.name} style={labelStyle}>
@@ -185,8 +176,6 @@ const RegisterPage: React.FC = () => {
                                     required
                                     style={inputStyle}
                                     placeholder={field.placeholder}
-                                    min={field.min}
-                                    max={field.max}
                                     onFocus={(e) => {
                                         e.target.style.borderColor = '#667eea';
                                         e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';

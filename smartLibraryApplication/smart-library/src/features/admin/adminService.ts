@@ -1,17 +1,18 @@
-import axios from 'axios';
+import axios from '../../utils/axiosConfig';
 import { AdminLoginDTO, AdminDetailDTO } from '../../types/admin';
 
-const BASE_URL = '/api/admin';
+// ✅ Auth işlemleri için ayrı bir base url tanımlandı
+const AUTH_BASE_URL = '/api/auth';
+const ADMIN_BASE_URL = '/api/admin';
 
-// login endpoint'i sadece "Giriş başarılı" veya hata mesajı dönüyor,
-// yani dönüş tipi string olabilir, ama başarılı olup olmadığı koddan anlaşılıyor
+// ✅ Admin login backend'e göre güncellendi
 export const adminLogin = async (data: AdminLoginDTO): Promise<string> => {
-    const response = await axios.post<string>(`${BASE_URL}/login`, data);
-    return response.data; // "Giriş başarılı" veya hata mesajı (örneğin 401 için hata fırlatır)
+    const response = await axios.post<string>(`${AUTH_BASE_URL}/admin/login`, data);
+    return response.data; // "Giriş başarılı" veya hata mesajı
 };
 
-// profil bilgisi endpoint'i AdminDetailDTO dönüyor
+// ✅ Admin profil bilgisi için (örneğin dashboard sayfası)
 export const getAdminProfile = async (username: string): Promise<AdminDetailDTO> => {
-    const response = await axios.get<AdminDetailDTO>(`${BASE_URL}/profile/${username}`);
+    const response = await axios.get<AdminDetailDTO>(`${ADMIN_BASE_URL}/profile/${username}`);
     return response.data;
 };
